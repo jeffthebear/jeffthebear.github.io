@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>US Modern Car Trends</title>
+    <!-- <link rel="stylesheet" href="style.css"> -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+        integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+</head>
+
+<body>
+    <main role="main" class="container">
+        <h1 style="margin: 1em 0 0;">US Modern Car Trends</h1>
+        <p><small>Using data provided by the EPA (source: https://www.kaggle.com/epa/fuel-economy)</small></p>
+        <h2 style="margin-top: 1em">The Modern Fuel Efficient Car</h2>
+        <p>Cars have become more fuel efficient from 1984 to 2017.
+            The average car has increased in miles per gallon from 
+            <span id="mpg-first"></span> MPG to 
+            <span id="mpg-last"></span> MPG with most of the gains
+            seen in the last decade.
+        </p>
+        <svg id='mpg-chart' width=500 height=350></svg>
+        <h2>The Modern Larger Car</h2>
+        <p>Cars have also become larger from 1984 to 2017.
+            The average car has gradually increased in passenger volume from 
+            <span id="passenger-volume-first"></span> cubic feet to 
+            <span id="passenger-volume-last"></span> cubic feet.  This shows fuel
+            efficiency gains are not made at the expense of car size.
+        </p>
+        <svg id='passenger-volume-chart' width=500 height=350></svg>
+        <h2>The Modern Engine</h2>
+        <p>Engine displacement in cars which determine size of the engines 
+            have fluctuated between 1984 to 2017 and have shrunk drastically
+            in the last decade.  Starting at
+            <span id="engine-displacement-first"></span> liters to most recently
+            <span id="engine-displacement-last"></span> liters.
+        </p>
+        <svg id='engine-displacement-chart' width=500 height=350></svg>
+        <h2>Your Car Trends</h2>
+        <p>Try this interactive chart to see how different models have changed 
+            over the years.</p>
+            <div class="container">
+                <div class="row">
+                    <div class="col-sm">
+                        <select id='measure-selection' class="custom-select">
+                            <option selected value='mpg'>MPG</option>
+                            <option value="passenger-volume">Passenger Volume</option>
+                            <option value="engine-displacement">Engine Displacement</option>
+                        </select>
+                    </div>
+                    <div class="col-sm">
+                        <select id='car-selection' class="custom-select">
+                        </select>
+                    </div>
+                </div>
+            </div>
+        <svg id='interactive' width=500 height=350></svg>
+    </main>
+    <script>
+        const years = range(1984, 2018);
+        const minYear = Math.min(...years);
+        const maxYear = Math.max(...years);
+        let data = null;
+
+        function calcYearMean(data, year, field) {
+            let yearFiltered = data.filter(d => d['Year'] == year);
+            return calcMean(yearFiltered, field);
+        }
+
+        function calcMean(data, field) {
+            let fieldData = data.map(d => parseFloat(d[field]));
+            let sum = fieldData.reduce((previous, current) => current += previous);
+            let mean = sum / fieldData.length;
+            return mean;
+        }
+
+        function range(start, end) {
+            count = end - start;
+            return Array.apply(0, Array(count))
+                .map((element, index) => index + start);
+        }
+
+        function renderLineChart(el, yData) {
+
+            let data = [];
+            for (let i = 0; i < years.length; i++) {
+                if (yData[i]){
+                    data.push({ 'year': years[i], 'yValue': yData[i] })
+                }
+            }
+            
+            let yDataFiltered = data.map(d => d['yValue']);
+            const minY = Math.min(...yDataFiltered);
+            const maxY = Math.max(...yDataFiltered);
+            let scaleX = d3.scaleLinear().domain([minYear, maxYear]).range([0, 400]);
+            let scaleY = d3.scaleLinear().domain([minY, maxY]).range([250, 0]);
+
+            d3.select(el).append("g").attr("transform", "translate(50,50)");
+
+            let line = d3.line()
+                .x(function(d){return scaleX(parseInt(d["year"]))})
+                .y(function(d){return scaleY(parseFloat(d["yValue"]))})
+            
+            d3.select(el)
+                .select("g")
+                .append('path')
+                .datum(data)
+                .attr("fill", "none")
+                .attr("stroke", "steelblue")
+                .attr("stroke-width", 1.5)
+                .attr('d', line);
+            // debugger;
+            
+            d3.select(el)
+                .select("g")
+                .selectAll('circle')
+                .data(data)
+                .enter()
+                .append('circle')
+                .attr('cx', function(d){return scaleX(parseInt(d["year"]))})
+                .attr('cy', function(d){return scaleY(parseFloat(d["yValue"]))})
+                .attr('r', function(d){return 2});
+
+            d3.select(el)
+                .append("g")
+                .attr("transform", "translate(50,50)")
+                .call(d3.axisLeft(scaleY).tickFormat(d3.format("~s")));
+
+            d3.select(el)
+                .append("g")
+                .attr("transform", "translate(50,300)")
+                .call(d3.axisBottom(scaleX)
+                    .tickValues([1985, 1990, 1995, 2000, 2005, 2010, 2015])
+                    .tickFormat(d3.format("d")));
+        }
+
+        function renderSceneText(meanCalc, metric) {
+            const firstValue = meanCalc[0].toFixed(1);
+            const lastValue = meanCalc[meanCalc.length - 1].toFixed(1);
+            document.getElementById(metric + '-first').innerText = firstValue;
+            document.getElementById(metric + '-last').innerText = lastValue;
+        }
+
+        function getCarMeasureStats(data, measure) {
+            // get single make/model per year
+            let carAndYearFiltered = {};
+            for (let car of data) {
+                let key = car['Make'] + " " + car['Model'] + " " + car['Year'];
+                if (!carAndYearFiltered[key]) {
+                    carAndYearFiltered[key] = car;
+                }
+            }
+
+            // get map from make and model to years for a measure
+            makeModelsList = Object.values(carAndYearFiltered)
+                                    .map(car => car['Make'] + " " + car['Model']);
+            let carStats = {}
+            for (let mm of makeModelsList){
+                carStats[mm] = Array(years.length).fill(undefined);
+            }
+            
+            // populate the make_models_measure
+            for (let car of Object.values(carAndYearFiltered)){
+                let key = car['Make'] + " " + car['Model'];
+                let year_idx = years.indexOf(parseInt(car['Year']));
+                carStats[key][year_idx] = car[measure];
+            }
+
+            return carStats;
+        }
+
+        async function onload() {
+            data = await d3.csv('./database.csv');
+
+            // calculate "Passenger Volume" and append value to data
+            data = data.map(d => {
+                let passengerVolume = Math.max(d['2D Passenger Volume'], d['4D Passenger Volume'], 
+                    d['Hatchback Passenger Volume']);
+                d['Passenger Volume'] = passengerVolume;
+                return d;
+            });
+
+            // load mpg chart
+            let meanMPG = years.map(year => calcYearMean(data, year, 'Combined MPG (FT1)'));
+            renderSceneText(meanMPG, 'mpg');
+            renderLineChart('#mpg-chart', meanMPG);
+            
+            // load passenger volume
+            let passengerVol = data.filter(pv => pv['Passenger Volume'] !== 0);
+            let meanPassengerVol = years.map(year => calcYearMean(passengerVol, year, 'Passenger Volume'));
+            renderSceneText(meanPassengerVol, 'passenger-volume');
+            renderLineChart('#passenger-volume-chart', meanPassengerVol);
+
+            // load engine displacement
+            let engineDisp = data.filter(d => d['Engine Displacement'] & (d['Engine Displacement'] !== 0));
+            let meanEngineDisp = years.map(year => calcYearMean(engineDisp, year, 'Engine Displacement'));
+            renderSceneText(meanEngineDisp, 'engine-displacement');
+            renderLineChart('#engine-displacement-chart', meanEngineDisp);
+
+            // populate car selection
+            let mpgStats = getCarMeasureStats(data, 'Combined MPG (FT1)')
+            let passengerVolumeStats = getCarMeasureStats(data, 'Passenger Volume')
+            let engineDisplacementStats = getCarMeasureStats(data, 'Engine Displacement')
+            
+            // filter out cars manufactured for less than n years
+            let min_car_years = 3;
+            let keysToDelete = [];
+            for (let measureStats of [mpgStats, passengerVolumeStats, engineDisplacementStats]) {
+                for (let carKey of Object.keys(measureStats)) {
+                    let valuesCnt = measureStats[carKey]
+                        .map(val => val ? 1 : 0)
+                        .reduce((a,b) => a + b, 0);
+                    if (valuesCnt < min_car_years) {
+                        keysToDelete.push(carKey);
+                    }
+                }
+            }
+            
+            for (let k2d of keysToDelete) {
+                delete mpgStats[k2d];
+                delete passengerVolumeStats[k2d];
+                delete engineDisplacementStats[k2d];
+            }
+
+            var carStats = {
+                'mpg': mpgStats,
+                'passenger-volume': passengerVolumeStats,
+                'engine-displacement': engineDisplacementStats
+            };
+
+            // populate cars based on one of the stats
+            for (let mm of Object.keys(mpgStats).sort()) {
+                let option = document.createElement("option");
+                option.text = mm;
+                option.value = mm;
+                let select = document.getElementById("car-selection");
+                select.appendChild(option);
+            }
+
+            function renderInteractiveChart() {
+                let measureSelEl = document.getElementById("measure-selection");
+                let measureSel = measureSelEl.options[measureSelEl.selectedIndex].value;
+                let carSelEl = document.getElementById("car-selection");
+                let carSel = carSelEl.options[carSelEl.selectedIndex].value;
+
+                document.getElementById("interactive").innerHTML = '';
+                renderLineChart('#interactive', carStats[measureSel][carSel]);
+            }
+
+            // add event listener for measure selection
+            document.getElementById("measure-selection").addEventListener('change', renderInteractiveChart);
+
+            // add event listener for car selection
+            document.getElementById("car-selection").addEventListener('change', renderInteractiveChart);
+
+            // render interactive chart
+            document.getElementById('car-selection').value='Honda Accord';
+            renderInteractiveChart();            
+        }
+
+        onload();
+    </script>
+</body>
+
+</html>
