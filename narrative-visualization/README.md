@@ -2,6 +2,7 @@
 
 This Narrative Visualization is created for CS 498: Data Visualization in Summer 2019.  The dataset used can be found at: https://www.kaggle.com/epa/fuel-economy
 
+You can view the webpage at: https://jeffthebear.github.io/narrative-visualization/
 
 ## The MIT License
 

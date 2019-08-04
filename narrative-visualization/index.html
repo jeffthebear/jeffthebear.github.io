@@ -7,11 +7,24 @@
     <!-- <link rel="stylesheet" href="style.css"> -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
         integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <style>
+        .main-container {
+            max-width: 960px;
+        }
+
+        .annotation-line {
+            opacity: 0.2;
+        }
+
+        .annotation-text {
+            opacity: 0.8;
+        }
+    </style>
     <script src="https://d3js.org/d3.v5.min.js"></script>
 </head>
 
 <body>
-    <main role="main" class="container">
+    <main role="main" class="container main-container">
         <h1 style="margin: 1em 0 0;">US Modern Car Trends</h1>
         <p><small>Using data provided by the EPA (source: https://www.kaggle.com/epa/fuel-economy)</small></p>
         <h2 style="margin-top: 1em">The Modern Fuel Efficient Car</h2>
@@ -21,7 +34,7 @@
             <span id="mpg-last"></span> MPG with most of the gains
             seen in the last decade.
         </p>
-        <svg id='mpg-chart' width=500 height=350></svg>
+        <svg id='mpg-chart' width=550 height=350></svg>
         <h2>The Modern Larger Car</h2>
         <p>Cars have also become larger from 1984 to 2017.
             The average car has gradually increased in passenger volume from 
@@ -29,7 +42,7 @@
             <span id="passenger-volume-last"></span> cubic feet.  This shows fuel
             efficiency gains are not made at the expense of car size.
         </p>
-        <svg id='passenger-volume-chart' width=500 height=350></svg>
+        <svg id='passenger-volume-chart' width=550 height=350></svg>
         <h2>The Modern Engine</h2>
         <p>Engine displacement in cars which determine size of the engines 
             have fluctuated between 1984 to 2017 and have shrunk drastically
@@ -37,9 +50,9 @@
             <span id="engine-displacement-first"></span> liters to most recently
             <span id="engine-displacement-last"></span> liters.
         </p>
-        <svg id='engine-displacement-chart' width=500 height=350></svg>
-        <h2>Your Car Trends</h2>
-        <p>Try this interactive chart to see how different models have changed 
+        <svg id='engine-displacement-chart' width=550 height=350></svg>
+        <h2>Make and Model Car Trends</h2>
+        <p>Try this interactive chart to see how your car and other makes and models have changed 
             over the years.</p>
             <div class="container">
                 <div class="row">
@@ -56,7 +69,7 @@
                     </div>
                 </div>
             </div>
-        <svg id='interactive' width=500 height=350></svg>
+        <svg id='interactive' width=650 height=350></svg>
     </main>
     <script>
         const years = range(1984, 2018);
@@ -82,7 +95,7 @@
                 .map((element, index) => index + start);
         }
 
-        function renderLineChart(el, yData) {
+        function renderLineChart(el, yData, unit, isAnnotateDecade) {
 
             let data = [];
             for (let i = 0; i < years.length; i++) {
@@ -94,28 +107,25 @@
             let yDataFiltered = data.map(d => d['yValue']);
             const minY = Math.min(...yDataFiltered);
             const maxY = Math.max(...yDataFiltered);
-            let scaleX = d3.scaleLinear().domain([minYear, maxYear]).range([0, 400]);
+            let scaleX = d3.scaleLinear().domain([minYear - 1, maxYear + 1]).range([0, 400]);
             let scaleY = d3.scaleLinear().domain([minY, maxY]).range([250, 0]);
 
             d3.select(el).append("g").attr("transform", "translate(50,50)");
+            let chartEl = d3.select(el).select("g");
 
             let line = d3.line()
                 .x(function(d){return scaleX(parseInt(d["year"]))})
                 .y(function(d){return scaleY(parseFloat(d["yValue"]))})
             
-            d3.select(el)
-                .select("g")
-                .append('path')
+            // add chart marks
+            chartEl.append('path')
                 .datum(data)
                 .attr("fill", "none")
                 .attr("stroke", "steelblue")
                 .attr("stroke-width", 1.5)
                 .attr('d', line);
-            // debugger;
             
-            d3.select(el)
-                .select("g")
-                .selectAll('circle')
+            chartEl.selectAll('circle')
                 .data(data)
                 .enter()
                 .append('circle')
@@ -123,6 +133,7 @@
                 .attr('cy', function(d){return scaleY(parseFloat(d["yValue"]))})
                 .attr('r', function(d){return 2});
 
+            // add chart axis
             d3.select(el)
                 .append("g")
                 .attr("transform", "translate(50,50)")
@@ -134,6 +145,69 @@
                 .call(d3.axisBottom(scaleX)
                     .tickValues([1985, 1990, 1995, 2000, 2005, 2010, 2015])
                     .tickFormat(d3.format("d")));
+
+            // add annotations
+            let firstYearValue = data[0];
+            let lastYearValue = data[data.length - 1];
+            let yearDiff = lastYearValue['year'] - firstYearValue['year'];
+
+            if (yearDiff < 10) {
+                // combine annotation text if year diff is less than 10
+                addAnnotationLine(chartEl, firstYearValue, scaleX, scaleY);
+                addAnnotationLine(chartEl, lastYearValue, scaleX, scaleY);
+                addAnnotationText(chartEl, unit, [firstYearValue, lastYearValue], scaleX, scaleY);
+            } else {
+                addAnnotationLine(chartEl, firstYearValue, scaleX, scaleY);
+                addAnnotationText(chartEl, unit, firstYearValue, scaleX, scaleY);
+                addAnnotationLine(chartEl, lastYearValue, scaleX, scaleY);    
+                addAnnotationText(chartEl, unit, lastYearValue, scaleX, scaleY);
+            }
+            
+            if (isAnnotateDecade) {
+                let decadeYearValue = data[data.length - 11];
+                addAnnotationLine(chartEl, decadeYearValue, scaleX, scaleY);
+                addAnnotationText(chartEl, unit, decadeYearValue, scaleX, scaleY);
+            }
+        }
+
+        function addAnnotationLine(chartEl, point, scaleX, scaleY) {
+            let path1x = scaleX(parseInt(point["year"]));
+            let path1y = scaleY(parseFloat(point["yValue"]));
+            let path2y = scaleY.range()[1] - 10;
+
+            chartEl.append('circle')
+                .attr('cx', function(d){return scaleX(parseInt(point["year"]))})
+                .attr('cy', function(d){return scaleY(parseFloat(point["yValue"]))})
+                .attr('r', function(d){return 2})
+                .attr('fill', 'red')
+                .classed("annotation-line", true);
+            
+            chartEl.append('path')
+                .attr("fill", "none")
+                .attr("stroke", "red")
+                .attr('d', "M " + path1x + " " + path1y + " L " + path1x + " " + path2y + " Z")
+                .classed("annotation-line", true);
+        }
+
+        function addAnnotationText(chartEl, unit, points, scaleX, scaleY) {
+            let point = (Array.isArray(points) ? points[0] : points);
+            let path1x = scaleX(parseInt(point["year"])) - 15;
+            let path1y = scaleY(parseFloat(point["yValue"]));
+            let path2y = scaleY.range()[1] - 10;
+
+            let text = point["year"] + ": " + parseFloat(point["yValue"]).toFixed(1) + " " + unit;
+            if (Array.isArray(points)) {
+                for (let p of points.slice(1)) {
+                    text += ", " + p["year"] + ": " + parseFloat(p["yValue"]).toFixed(1) + " " + unit;
+                }
+            }
+
+            chartEl.append('text')
+                .attr('class', 'small')
+                .attr('x', path1x)
+                .attr('y', path2y)
+                .classed("annotation-text", true)
+                .html(text);
         }
 
         function renderSceneText(meanCalc, metric) {
@@ -185,19 +259,19 @@
             // load mpg chart
             let meanMPG = years.map(year => calcYearMean(data, year, 'Combined MPG (FT1)'));
             renderSceneText(meanMPG, 'mpg');
-            renderLineChart('#mpg-chart', meanMPG);
+            renderLineChart('#mpg-chart', meanMPG, 'mpg', true);
             
             // load passenger volume
             let passengerVol = data.filter(pv => pv['Passenger Volume'] !== 0);
             let meanPassengerVol = years.map(year => calcYearMean(passengerVol, year, 'Passenger Volume'));
             renderSceneText(meanPassengerVol, 'passenger-volume');
-            renderLineChart('#passenger-volume-chart', meanPassengerVol);
+            renderLineChart('#passenger-volume-chart', meanPassengerVol, 'cu ft');
 
             // load engine displacement
             let engineDisp = data.filter(d => d['Engine Displacement'] & (d['Engine Displacement'] !== 0));
             let meanEngineDisp = years.map(year => calcYearMean(engineDisp, year, 'Engine Displacement'));
             renderSceneText(meanEngineDisp, 'engine-displacement');
-            renderLineChart('#engine-displacement-chart', meanEngineDisp);
+            renderLineChart('#engine-displacement-chart', meanEngineDisp, 'L', true);
 
             // populate car selection
             let mpgStats = getCarMeasureStats(data, 'Combined MPG (FT1)')
@@ -244,9 +318,14 @@
                 let measureSel = measureSelEl.options[measureSelEl.selectedIndex].value;
                 let carSelEl = document.getElementById("car-selection");
                 let carSel = carSelEl.options[carSelEl.selectedIndex].value;
+                let unitMap = {
+                    'mpg': 'mpg',
+                    'passenger-volume': 'cu ft',
+                    'engine-displacement': 'L'
+                };
 
                 document.getElementById("interactive").innerHTML = '';
-                renderLineChart('#interactive', carStats[measureSel][carSel]);
+                renderLineChart('#interactive', carStats[measureSel][carSel], unitMap[measureSel]);
             }
 
             // add event listener for measure selection
